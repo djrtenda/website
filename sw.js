@@ -1,4 +1,4 @@
-const CACHE_NAME = 'djrtenda-v2-private';
+const CACHE_NAME = 'djrtenda-v5-private';
 const urlsToCache = [
   '/web/',
   '/web/index.html',
