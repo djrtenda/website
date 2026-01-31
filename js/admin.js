@@ -11,13 +11,20 @@ const totalHeldBalanceEl = document.getElementById('totalHeldBalance');
 const monthlyTransactionsEl = document.getElementById('monthlyTransactions');
 
 document.addEventListener('DOMContentLoaded', function() {
-    // 1. INIT DARK MODE
+    // 1. INIT DARK MODE & THEME COLOR
+    const metaThemeColor = document.getElementById('metaThemeColor');
+    
     if (localStorage.getItem('theme') === 'dark') {
         document.documentElement.classList.add('dark');
+        // Set warna browser jadi gelap
+        if(metaThemeColor) metaThemeColor.setAttribute('content', '#111827');
     } else {
         document.documentElement.classList.remove('dark');
+        // Set warna browser jadi terang
+        if(metaThemeColor) metaThemeColor.setAttribute('content', '#f9fafb');
     }
 
+    // ... (kode sisanya biarkan sama) ...
     const adminName = localStorage.getItem('userName') || 'Admin';
     if(document.getElementById('adminName')) {
         document.getElementById('adminName').textContent = adminName;
@@ -58,24 +65,32 @@ function setupEventListeners() {
     document.getElementById('searchEmployee').addEventListener('input', renderEmployeesCard);
 }
 
-// --- FITUR BARU: TOGGLE DARK MODE (Auto Refresh Chart) ---
+// --- FITUR BARU: TOGGLE DARK MODE + ADAPTIVE BROWSER BAR ---
 function toggleDarkMode() {
     const html = document.documentElement;
+    const metaThemeColor = document.getElementById('metaThemeColor');
     let isDark;
 
     if (html.classList.contains('dark')) {
+        // Pindah ke LIGHT MODE
         html.classList.remove('dark');
         localStorage.setItem('theme', 'light');
         isDark = false;
+        
+        // Ubah warna Address Bar Browser jadi Putih/Abu Terang
+        if(metaThemeColor) metaThemeColor.setAttribute('content', '#f9fafb'); 
     } else {
+        // Pindah ke DARK MODE
         html.classList.add('dark');
         localStorage.setItem('theme', 'dark');
         isDark = true;
+
+        // Ubah warna Address Bar Browser jadi Hitam Gelap (sesuai bg-gray-900)
+        if(metaThemeColor) metaThemeColor.setAttribute('content', '#111827');
     }
 
-    // UPDATE: Paksa chart digambar ulang agar warna teks berubah
+    // Refresh Chart agar warna teks menyesuaikan
     if(typeof renderSalaryChart === 'function') {
-        // Beri jeda sedikit agar transisi CSS selesai dulu, baru gambar ulang
         setTimeout(() => {
             renderSalaryChart(); 
         }, 100); 
