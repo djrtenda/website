@@ -517,7 +517,7 @@ async function handleAddIndividualSalary(e) {
             employeeName: userName,
             type: 'salary',
             amount: amount,
-            description: description || 'Bonus/Gaji Tambahan',
+            description: description || 'Tanpa Keterangan',
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
