@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rekap Matriks Gaji - DJR Tenda</title>
+    <link rel="icon" href="assets/img/djrtenda.png">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        .sheet-table {
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 0.85rem;
+            white-space: nowrap; /* Mencegah teks turun ke bawah */
+        }
+        .sheet-table th, .sheet-table td {
+            border: 1px solid #c0c0c0;
+            padding: 6px 10px;
+            text-align: right; /* Angka rata kanan ala Excel */
+        }
+        .sheet-table th {
+            background-color: #e5e7eb;
+            text-align: center;
+            font-weight: 700;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        /* Kolom Tanggal Sticky di Kiri */
+        .sheet-table td:first-child, .sheet-table th:first-child {
+            position: sticky;
+            left: 0;
+            background-color: #f3f4f6;
+            text-align: left;
+            z-index: 20;
+            font-weight: 600;
+            border-right: 2px solid #9ca3af;
+        }
+        .sheet-table tr:hover td {
+            background-color: #f0f9ff;
+        }
+        .cell-isi {
+            color: #1e40af; /* Biru */
+            font-weight: 500;
+        }
+        .total-row td {
+            background-color: #dbeafe !important;
+            font-weight: 800;
+            border-top: 2px solid #3b82f6;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+
+    <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30">
+        <div class="max-w-full px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center">
+                    <a href="admin.html" class="text-gray-500 hover:text-blue-600 mr-4">
+                        <i class="fas fa-arrow-left text-xl"></i>
+                    </a>
+                    <h1 class="text-lg font-bold text-gray-800 flex items-center">
+                        <i class="fas fa-table text-green-600 mr-2"></i> Rekap Matriks
+                    </h1>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <input type="month" id="filterMonth" class="border border-gray-300 rounded px-2 py-1 text-sm outline-none focus:border-blue-500">
+                    <button onclick="downloadExcel()" class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700">
+                        <i class="fas fa-file-excel mr-1"></i> Excel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="flex-grow p-4 overflow-hidden flex flex-col">
+        <div class="bg-white shadow border border-gray-300 rounded overflow-auto flex-grow relative" style="max-height: 85vh;">
+            <table class="sheet-table" id="matrixTable">
+                <thead id="matrixHead">
+                    </thead>
+                <tbody id="matrixBody">
+                    </tbody>
+                <tfoot id="matrixFoot">
+                    </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <script src="firebase-config.js"></script>
+    <script src="js/security.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/rekap.js"></script>
+</body>
+</html>

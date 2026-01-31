@@ -1,6 +1,5 @@
 <!DOCTYPE html>
-<html lang="id">
-<head>
+<html lang="id" class="light"> <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - DJR Tenda</title>
@@ -10,60 +9,51 @@
     <link rel="apple-touch-icon" href="assets/img/icon-192x192.png">
     
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class', // Mengaktifkan Dark Mode via class
+        }
+    </script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
     <style>
-        /* Animasi Toast */
-        @keyframes slideInRight {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes slideOutRight {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(100%); opacity: 0; }
-        }
+        @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideOutRight { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
         .toast-animate-in { animation: slideInRight 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
         .toast-animate-out { animation: slideOutRight 0.4s ease-in forwards; }
-
-        /* Animasi RGB Bergerak (Untuk Teks Admin) */
-        @keyframes rgbFlow {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-
+        
+        /* Animasi RGB */
+        @keyframes rgbFlow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
         .rgb-text-animate {
-            background: linear-gradient(120deg, 
-                #ff0000, #ff8000, #ffff00, 
-                #00ff00, #00ffff, #0000ff, 
-                #8000ff, #ff00ff, #ff0000);
-            background-size: 300% 300%;
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            animation: rgbFlow 4s linear infinite;
-            font-weight: 800;
-            letter-spacing: 1px;
+            background: linear-gradient(120deg, #ff0000, #ff8000, #ffff00, #00ff00, #00ffff, #0000ff, #8000ff, #ff00ff, #ff0000);
+            background-size: 300% 300%; -webkit-background-clip: text; background-clip: text; color: transparent;
+            animation: rgbFlow 4s linear infinite; font-weight: 800; letter-spacing: 1px;
             text-shadow: 0 0 10px rgba(255,255,255,0.2);
         }
+
+        /* Scrollbar Custom untuk Dark Mode */
+        .dark ::-webkit-scrollbar { width: 8px; }
+        .dark ::-webkit-scrollbar-track { background: #1f2937; }
+        .dark ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        .dark ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
     </style>
 
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-    
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://unpkg.com/jspdf-autotable@3.5.23/dist/jspdf.plugin.autotable.js"></script>
 </head>
-<body class="bg-gray-50">
-    <nav class="bg-white shadow-lg sticky top-0 z-40">
+<body class="bg-gray-50 dark:bg-gray-900 transition-colors duration-300 pb-10">
+    
+    <nav class="bg-white dark:bg-gray-800 shadow-lg sticky top-0 z-40 transition-colors duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
                 <div class="flex items-center">
                     <div class="flex-shrink-0 flex items-center">
                         <i class="fas fa-tent text-blue-600 text-2xl mr-3"></i>
-                        <h1 class="text-xl font-bold text-gray-900">
+                        <h1 class="text-xl font-bold text-gray-900 dark:text-white">
                             <span>DJR Tenda</span>
                             <span class="hidden sm:inline"> - Buku Gaji</span>
                         </h1>
@@ -71,15 +61,17 @@
                 </div>
                 <div class="flex items-center space-x-4">
                     <span class="flex items-center mr-2">
-                        <div class="bg-gray-100 p-2 rounded-full mr-2">
-                            <i class="fas fa-user-shield text-blue-600"></i>
+                        <div class="bg-gray-100 dark:bg-gray-700 p-2 rounded-full mr-2 transition-colors">
+                            <i class="fas fa-user-shield text-blue-600 dark:text-blue-400"></i>
                         </div>
                         <div class="flex flex-col items-start">
-                            <span class="text-[10px] text-gray-500 font-semibold leading-none uppercase">Logged in as</span>
+                            <span class="text-[10px] text-gray-500 dark:text-gray-400 font-semibold leading-none uppercase">Logged in as</span>
                             <span id="adminName" class="rgb-text-animate text-lg leading-none mt-0.5">ADMIN</span>
                         </div>
                     </span>
-
+                    <button onclick="document.getElementById('settingsModal').classList.remove('hidden')" class="text-gray-500 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-full transition mx-1" title="Pengaturan">
+                        <i class="fas fa-cog text-xl"></i>
+                    </button>
                     <button onclick="DJRTenda.logoutUser()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-md text-sm font-medium transition duration-150 flex items-center">
                         <i class="fas fa-sign-out-alt"></i>
                         <span class="hidden sm:inline ml-2">Keluar</span>
@@ -90,51 +82,52 @@
     </nav>
 
     <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg transition-colors">
                 <div class="p-5">
                     <div class="flex items-center">
-                        <div class="flex-shrink-0"><i class="fas fa-users text-blue-600 text-2xl"></i></div>
+                        <div class="flex-shrink-0"><i class="fas fa-users text-blue-600 dark:text-blue-400 text-2xl"></i></div>
                         <div class="ml-5 w-0 flex-1">
-                            <dl><dt class="text-sm font-medium text-gray-500 truncate">Total Karyawan</dt><dd class="text-lg font-medium text-gray-900" id="totalEmployees">0</dd></dl>
+                            <dl><dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total Karyawan</dt><dd class="text-lg font-medium text-gray-900 dark:text-white" id="totalEmployees">0</dd></dl>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg transition-colors">
                 <div class="p-5">
                     <div class="flex items-center">
-                        <div class="flex-shrink-0"><i class="fas fa-money-bill-wave text-green-600 text-2xl"></i></div>
+                        <div class="flex-shrink-0"><i class="fas fa-money-bill-wave text-green-600 dark:text-green-400 text-2xl"></i></div>
                         <div class="ml-5 w-0 flex-1">
-                            <dl><dt class="text-sm font-medium text-gray-500 truncate">Total Gaji Dibagikan</dt><dd class="text-lg font-medium text-gray-900" id="totalSalaryDistributed">Rp 0</dd></dl>
+                            <dl><dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total Gaji Dibagikan</dt><dd class="text-lg font-medium text-gray-900 dark:text-white" id="totalSalaryDistributed">Rp 0</dd></dl>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg transition-colors">
                 <div class="p-5">
                     <div class="flex items-center">
-                        <div class="flex-shrink-0"><i class="fas fa-wallet text-orange-600 text-2xl"></i></div>
+                        <div class="flex-shrink-0"><i class="fas fa-wallet text-orange-600 dark:text-orange-400 text-2xl"></i></div>
                         <div class="ml-5 w-0 flex-1">
-                            <dl><dt class="text-sm font-medium text-gray-500 truncate">Saldo Tertahan</dt><dd class="text-lg font-medium text-gray-900" id="totalHeldBalance">Rp 0</dd></dl>
+                            <dl><dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Saldo Tertahan</dt><dd class="text-lg font-medium text-gray-900 dark:text-white" id="totalHeldBalance">Rp 0</dd></dl>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg transition-colors">
                 <div class="p-5">
                     <div class="flex items-center">
-                        <div class="flex-shrink-0"><i class="fas fa-chart-line text-purple-600 text-2xl"></i></div>
+                        <div class="flex-shrink-0"><i class="fas fa-chart-line text-purple-600 dark:text-purple-400 text-2xl"></i></div>
                         <div class="ml-5 w-0 flex-1">
-                            <dl><dt class="text-sm font-medium text-gray-500 truncate">Transaksi Bulan Ini</dt><dd class="text-lg font-medium text-gray-900" id="monthlyTransactions">0</dd></dl>
+                            <dl><dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Transaksi Bulan Ini</dt><dd class="text-lg font-medium text-gray-900 dark:text-white" id="monthlyTransactions">0</dd></dl>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
         
-        <div class="bg-white shadow rounded-lg p-4 sm:p-6 mb-8">
-            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-4 sm:p-6 mb-8 transition-colors">
+            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-4">
                 <i class="fas fa-chart-bar mr-2"></i>Grafik Distribusi Gaji
             </h3>
             <div class="h-64 sm:h-72">
@@ -142,27 +135,30 @@
             </div>
         </div>
 
-        <div class="bg-white shadow rounded-lg mb-8">
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg mb-8 transition-colors">
             <div class="px-4 py-5 sm:p-6">
-                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4"><i class="fas fa-bolt mr-2"></i>Aksi Cepat</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <button onclick="showDistributeSalaryModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-md font-medium transition duration-150 flex items-center justify-center">
+                <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-4"><i class="fas fa-bolt mr-2"></i>Aksi Cepat</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <button onclick="showDistributeSalaryModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-md font-medium transition duration-150 flex items-center justify-center">
                         <i class="fas fa-plus mr-2"></i>Bagikan Gaji Serentak
                     </button>
-                    <button onclick="showAddEmployeeModal()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-md font-medium transition duration-150 flex items-center justify-center">
+                    <button onclick="showAddEmployeeModal()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-md font-medium transition duration-150 flex items-center justify-center">
                         <i class="fas fa-user-plus mr-2"></i>Tambah Karyawan
                     </button>
+                    <a href="rekap.html" class="bg-gray-700 hover:bg-gray-800 text-white px-4 py-3 rounded-md font-medium transition duration-150 flex items-center justify-center">
+                        <i class="fas fa-table mr-2"></i>Lihat Rekap Gaji
+                    </a>
                 </div>
             </div>
         </div>
 
-        <div class="bg-white shadow rounded-lg">
-            <div class="border-b border-gray-200">
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg mb-8 transition-colors">
+            <div class="border-b border-gray-200 dark:border-gray-700">
                 <nav class="-mb-px flex justify-around">
-                    <button class="tab-button active flex-1 text-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm" data-tab="employees">
+                    <button class="tab-button active flex-1 text-center border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 py-4 px-1 border-b-2 font-medium text-sm" data-tab="employees">
                         <i class="fas fa-users"></i><span class="hidden sm:inline ml-2">Daftar Karyawan</span>
                     </button>
-                    <button class="tab-button flex-1 text-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm" data-tab="transactions">
+                    <button class="tab-button flex-1 text-center border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 py-4 px-1 border-b-2 font-medium text-sm" data-tab="transactions">
                         <i class="fas fa-history"></i><span class="hidden sm:inline ml-2">Log Transaksi</span>
                     </button>
                 </nav>
@@ -170,22 +166,20 @@
 
             <div id="employees-tab" class="tab-content p-4">
                 <div class="flex flex-col mb-4 space-y-3">
-                    <h3 class="text-lg font-bold text-gray-800 flex items-center">
-                        <i class="fas fa-wallet mr-2 text-blue-600"></i>Kelola Saldo
+                    <h3 class="text-lg font-bold text-gray-800 dark:text-white flex items-center">
+                        <i class="fas fa-wallet mr-2 text-blue-600 dark:text-blue-400"></i>Kelola Saldo
                     </h3>
                     <div class="relative w-full">
                         <input type="text" id="searchEmployee" placeholder="Cari nama..." 
-                               class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500 transition-all">
+                               class="w-full pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg text-sm focus:ring-1 focus:ring-blue-500 transition-all">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <i class="fas fa-search text-gray-400 text-xs"></i>
+                            <i class="fas fa-search text-gray-400 dark:text-gray-500 text-xs"></i>
                         </div>
                     </div>
                 </div>
 
                 <div class="max-h-[480px] overflow-y-auto pr-1 pb-2">
-                    <div id="employeesGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        </div>
-                    
+                    <div id="employeesGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
                     <div id="emptyState" class="hidden text-center py-8">
                         <p class="text-gray-400 text-sm">Belum ada data.</p>
                     </div>
@@ -194,54 +188,50 @@
 
             <div id="transactions-tab" class="tab-content p-6 hidden">
                 <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 space-y-2 sm:space-y-0">
-                    <h3 class="text-lg font-medium text-gray-900 flex-shrink-0">Riwayat Keuangan</h3>
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white flex-shrink-0">Riwayat Keuangan</h3>
                     <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
-                        <select id="transactionFilter" class="px-3 py-2 border border-gray-300 rounded-md text-sm">
+                        <select id="transactionFilter" class="px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md text-sm">
                             <option value="all">Semua Jenis</option>
                             <option value="salary">Gaji Masuk</option>
                             <option value="withdrawal">Penarikan</option>
                         </select>
-                        <input type="month" id="exportPeriod" class="px-3 py-2 border border-gray-300 rounded-md text-sm">
+                        <input type="month" id="exportPeriod" class="px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md text-sm">
                         <button id="exportPdfBtn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm flex-shrink-0 flex items-center">
                             <i class="fas fa-file-pdf mr-1"></i> <span class="hidden sm:inline">Export PDF</span>
                         </button>
                     </div>
                 </div>
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead class="bg-gray-50 dark:bg-gray-700">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Karyawan</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jenis</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jumlah</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keterangan</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Tanggal</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Karyawan</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Jenis</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Jumlah</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Keterangan</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Aksi</th>
                             </tr>
                         </thead>
-                        <tbody id="transactionsTableBody" class="bg-white divide-y divide-gray-200"></tbody>
+                        <tbody id="transactionsTableBody" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700"></tbody>
                     </table>
                 </div>
                 <div class="mt-4 flex items-center justify-center gap-x-4">
-                    <button id="prevPageBtn" class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
-                        <i class="fas fa-arrow-left mr-1.5"></i>Sebelumnya
-                    </button>
-                    <span id="pageInfo" class="text-sm text-gray-700 px-2">Halaman 1</span>
-                    <button id="nextPageBtn" class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-md text-sm flex items-center">
-                        Berikutnya<i class="fas fa-arrow-right ml-1.5"></i>
-                    </button>
+                    <button id="prevPageBtn" class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-md text-sm disabled:opacity-50"><i class="fas fa-arrow-left mr-1.5"></i>Prev</button>
+                    <span id="pageInfo" class="text-sm text-gray-700 dark:text-gray-300 px-2">Halaman 1</span>
+                    <button id="nextPageBtn" class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-md text-sm">Next<i class="fas fa-arrow-right ml-1.5"></i></button>
                 </div>
             </div>
         </div>
     </div>
 
-    <div id="addEmployeeModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-md shadow-lg rounded-md bg-white">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Tambah Karyawan Baru</h3>
+    <div id="addEmployeeModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center">
+        <div class="relative p-5 border w-11/12 max-w-md shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Tambah Karyawan Baru</h3>
             <form id="addEmployeeForm" class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Nama Lengkap</label>
-                    <input type="text" id="employeeName" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Contoh: Handika Kurniawan">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nama Lengkap</label>
+                    <input type="text" id="employeeName" required class="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm" placeholder="Masukkan Nama">
                 </div>
                 <div class="flex justify-end space-x-3 pt-4">
                     <button type="button" onclick="document.getElementById('addEmployeeModal').classList.add('hidden')" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-md">Batal</button>
@@ -251,14 +241,14 @@
         </div>
     </div>
 
-    <div id="editEmployeeModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-md shadow-lg rounded-md bg-white">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Edit Data Karyawan</h3>
+    <div id="editEmployeeModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center">
+        <div class="relative p-5 border w-11/12 max-w-md shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Edit Data Karyawan</h3>
             <form id="editEmployeeForm" class="space-y-4">
                 <input type="hidden" id="editEmployeeId">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Nama Lengkap</label>
-                    <input type="text" id="editEmployeeName" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nama Lengkap</label>
+                    <input type="text" id="editEmployeeName" required class="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md">
                 </div>
                 <div class="flex justify-end space-x-3 pt-4">
                     <button type="button" onclick="document.getElementById('editEmployeeModal').classList.add('hidden')" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-md">Batal</button>
@@ -268,63 +258,167 @@
         </div>
     </div>
 
-    <div id="distributeSalaryModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-md shadow-lg rounded-md bg-white">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Bagikan Gaji Serentak</h3>
-            <p class="text-xs text-gray-500 mb-4">Gaji akan ditambahkan ke SEMUA karyawan yang terdaftar.</p>
+    <div id="distributeSalaryModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center">
+        <div class="relative p-5 border w-11/12 max-w-md shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Bagikan Gaji Serentak</h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Gaji akan ditambahkan ke SEMUA karyawan.</p>
             <form id="distributeSalaryForm" class="space-y-4">
-                <div><label class="block text-sm font-medium text-gray-700">Jumlah Gaji (Rp)</label><input type="text" id="salaryAmount" inputmode="numeric" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></div>
-                <div><label class="block text-sm font-medium text-gray-700">Keterangan</label><textarea id="salaryDescription" rows="2" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="Contoh: Pasang Tenda"></textarea></div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Jumlah Gaji (Rp)</label>
+                    <input type="text" id="salaryAmount" inputmode="numeric" required class="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md">
+                    <div class="flex gap-2 mt-2 overflow-x-auto pb-1">
+                        <button type="button" onclick="setQuickNominal('salaryAmount', 50000)" class="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs rounded border border-blue-200 dark:border-blue-700 hover:bg-blue-200 whitespace-nowrap">50rb</button>
+                        <button type="button" onclick="setQuickNominal('salaryAmount', 100000)" class="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs rounded border border-blue-200 dark:border-blue-700 hover:bg-blue-200 whitespace-nowrap">100rb</button>
+                        <button type="button" onclick="setQuickNominal('salaryAmount', 500000)" class="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs rounded border border-blue-200 dark:border-blue-700 hover:bg-blue-200 whitespace-nowrap">500rb</button>
+                    </div>
+                </div>
+                <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Keterangan</label><textarea id="salaryDescription" rows="2" class="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md" placeholder="Contoh: Gaji Pasang Tenda (opsional)"></textarea></div>
                 <div class="flex justify-end space-x-3 pt-4"><button type="button" onclick="document.getElementById('distributeSalaryModal').classList.add('hidden')" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-md">Batal</button><button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">Bagikan</button></div>
             </form>
         </div>
     </div>
 
-    <div id="addSalaryModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-md shadow-lg rounded-md bg-white">
-            <h3 class="text-lg font-medium text-blue-800 mb-1"><i class="fas fa-plus-circle mr-2"></i>Tambah Gaji</h3>
-            <p class="text-sm text-gray-600 mb-4">Untuk: <span id="individualEmployeeName" class="font-bold"></span></p>
+    <div id="addSalaryModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center">
+        <div class="relative p-5 border w-11/12 max-w-md shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <h3 class="text-lg font-medium text-blue-800 dark:text-blue-400 mb-1"><i class="fas fa-plus-circle mr-2"></i>Tambah Gaji / Bonus</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Untuk: <span id="individualEmployeeName" class="font-bold"></span></p>
             <form id="addSalaryForm" class="space-y-4">
                 <input type="hidden" id="individualEmployeeId">
-                <div><label class="block text-sm font-medium text-gray-700">Jumlah (Rp)</label><input type="text" id="individualSalaryAmount" inputmode="numeric" required class="mt-1 block w-full px-3 py-2 border border-blue-300 rounded-md shadow-sm focus:ring-blue-500"></div>
-                <div><label class="block text-sm font-medium text-gray-700">Keterangan</label><input type="text" id="individualSalaryDescription" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="Contoh: Bonus Kerajinan"></div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Jumlah (Rp)</label>
+                    <input type="text" id="individualSalaryAmount" inputmode="numeric" required class="mt-1 block w-full px-3 py-2 border border-blue-300 dark:border-blue-700 dark:bg-gray-700 dark:text-white rounded-md">
+                    <div class="flex gap-2 mt-2 overflow-x-auto pb-1">
+                        <button type="button" onclick="setQuickNominal('individualSalaryAmount', 50000)" class="px-2 py-1 bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs rounded border border-blue-200 hover:bg-blue-100 whitespace-nowrap">50rb</button>
+                        <button type="button" onclick="setQuickNominal('individualSalaryAmount', 100000)" class="px-2 py-1 bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs rounded border border-blue-200 hover:bg-blue-100 whitespace-nowrap">100rb</button>
+                        <button type="button" onclick="setQuickNominal('individualSalaryAmount', 200000)" class="px-2 py-1 bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs rounded border border-blue-200 hover:bg-blue-100 whitespace-nowrap">200rb</button>
+                    </div>
+                </div>
+                <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Keterangan</label><input type="text" id="individualSalaryDescription" class="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md" placeholder="Contoh: Bonus Kerajinan"></div>
                 <div class="flex justify-end space-x-3 pt-4"><button type="button" onclick="document.getElementById('addSalaryModal').classList.add('hidden')" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-md">Batal</button><button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">Tambah</button></div>
             </form>
         </div>
     </div>
 
-    <div id="withdrawModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-md shadow-lg rounded-md bg-white">
-            <h3 class="text-lg font-medium text-red-800 mb-1"><i class="fas fa-minus-circle mr-2"></i>Catat Penarikan / Kasbon</h3>
-            <p class="text-sm text-gray-600 mb-4">Potong saldo milik: <span id="withdrawEmployeeName" class="font-bold"></span></p>
+    <div id="withdrawModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center">
+        <div class="relative p-5 border w-11/12 max-w-md shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <h3 class="text-lg font-medium text-red-800 dark:text-red-400 mb-1"><i class="fas fa-minus-circle mr-2"></i>Catat Penarikan / Kasbon</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Potong saldo milik: <span id="withdrawEmployeeName" class="font-bold"></span></p>
             <form id="withdrawForm" class="space-y-4">
                 <input type="hidden" id="withdrawEmployeeId">
-                <div><label class="block text-sm font-medium text-gray-700">Jumlah Penarikan (Rp)</label><input type="text" id="withdrawAmount" inputmode="numeric" required class="mt-1 block w-full px-3 py-2 border border-red-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"></div>
-                <div><label class="block text-sm font-medium text-gray-700">Keterangan</label><input type="text" id="withdrawDescription" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="Contoh: Ambil Gaji"></div>
-                <div class="flex justify-end space-x-3 pt-4"><button type="button" onclick="document.getElementById('withdrawModal').classList.add('hidden')" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-md">Batal</button><button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md">Konfirmasi Tarik</button></div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Jumlah Penarikan (Rp)</label>
+                    <input type="text" id="withdrawAmount" inputmode="numeric" required class="mt-1 block w-full px-3 py-2 border border-red-300 dark:border-red-700 dark:bg-gray-700 dark:text-white rounded-md">
+                    <div class="flex gap-2 mt-2 overflow-x-auto pb-1">
+                        <button type="button" onclick="setQuickNominal('withdrawAmount', 20000)" class="px-2 py-1 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 text-xs rounded border border-red-200 hover:bg-red-100 whitespace-nowrap">20rb</button>
+                        <button type="button" onclick="setQuickNominal('withdrawAmount', 50000)" class="px-2 py-1 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 text-xs rounded border border-red-200 hover:bg-red-100 whitespace-nowrap">50rb</button>
+                        <button type="button" onclick="setQuickNominal('withdrawAmount', 100000)" class="px-2 py-1 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 text-xs rounded border border-red-200 hover:bg-red-100 whitespace-nowrap">100rb</button>
+                    </div>
+                </div>
+                <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Keterangan</label><input type="text" id="withdrawDescription" class="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md" placeholder="Contoh: Kasbon rokok"></div>
+                <div class="flex justify-end space-x-3 pt-4"><button type="button" onclick="document.getElementById('withdrawModal').classList.add('hidden')" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-md">Batal</button><button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md">Konfirmasi</button></div>
             </form>
+        </div>
+    </div>
+
+    <div id="payslipModal" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full hidden z-[70] flex items-center justify-center backdrop-blur-sm">
+        <div class="relative bg-white dark:bg-gray-800 w-full max-w-sm mx-auto rounded-lg shadow-2xl overflow-hidden">
+            <div class="h-2 bg-blue-600 w-full"></div>
+            <div class="p-6">
+                <div class="text-center border-b border-gray-200 dark:border-gray-700 pb-4 mb-4">
+                    <h2 class="text-xl font-bold text-gray-800 dark:text-white tracking-wide uppercase">DJR TENDA</h2>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Bukti Transaksi Keuangan</p>
+                </div>
+                <div id="payslipContent" class="space-y-3 text-sm text-gray-800 dark:text-gray-200">
+                    <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">Tanggal</span><span id="psDate" class="font-semibold">01 Jan</span></div>
+                    <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">Karyawan</span><span id="psName" class="font-semibold">Andri</span></div>
+                    <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">Jenis</span><span id="psType" class="font-semibold">Gaji</span></div>
+                    <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">Keterangan</span><span id="psDesc" class="text-right truncate max-w-[150px]">-</span></div>
+                    <div class="my-4 border-t border-dashed border-gray-300 dark:border-gray-600"></div>
+                    <div class="flex justify-between items-center"><span class="text-gray-600 dark:text-gray-400 font-bold">NOMINAL</span><span id="psAmount" class="text-2xl font-extrabold text-blue-600 dark:text-blue-400">Rp 0</span></div>
+                </div>
+                <div class="mt-8 text-center"><p class="text-[10px] text-gray-400">Disetujui Oleh Admin</p></div>
+            </div>
+            <div class="bg-gray-50 dark:bg-gray-700 px-6 py-4 flex space-x-3">
+                <button onclick="document.getElementById('payslipModal').classList.add('hidden')" class="flex-1 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 text-gray-700 dark:text-white py-2 rounded-md font-medium text-sm">Tutup</button>
+                <button id="btnShareWA" class="flex-1 bg-green-600 text-white py-2 rounded-md hover:bg-green-700 font-medium text-sm"><i class="fab fa-whatsapp"></i> WA</button>
+                <button id="btnDownloadPDF" class="flex-1 bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 font-medium text-sm"><i class="fas fa-file-pdf"></i> PDF</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="settingsModal" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full hidden z-[80] flex items-center justify-center backdrop-blur-sm">
+        <div class="relative bg-white dark:bg-gray-800 w-full max-w-sm mx-auto rounded-xl shadow-2xl overflow-hidden transform transition-all">
+            <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900">
+                <h3 class="text-lg font-bold text-gray-800 dark:text-white"><i class="fas fa-cog text-gray-500 mr-2"></i>Pengaturan</h3>
+                <button onclick="document.getElementById('settingsModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h4 class="text-sm font-bold text-gray-800 dark:text-white">Mode Gelap</h4>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Tampilan nyaman di mata.</p>
+                    </div>
+                    <button onclick="toggleDarkMode()" class="bg-gray-200 dark:bg-gray-600 relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none">
+                        <span id="darkModeToggleBall" class="translate-x-0 dark:translate-x-5 pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
+                    </button>
+                </div>
+
+                <hr class="border-gray-100 dark:border-gray-700">
+
+                <div>
+                    <h4 class="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-3">Keamanan Data</h4>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="handleBackup()" class="flex flex-col items-center justify-center p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                            <i class="fas fa-download text-green-600 text-xl mb-1"></i>
+                            <span class="text-xs font-bold text-gray-700 dark:text-gray-300">Backup</span>
+                        </button>
+                        <button onclick="document.getElementById('fileRestore').click()" class="flex flex-col items-center justify-center p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                            <i class="fas fa-upload text-blue-600 text-xl mb-1"></i>
+                            <span class="text-xs font-bold text-gray-700 dark:text-gray-300">Restore</span>
+                        </button>
+                        <input type="file" id="fileRestore" class="hidden" accept=".json" onchange="handleRestore(this)">
+                    </div>
+                </div>
+
+                <hr class="border-gray-100 dark:border-gray-700">
+
+                <div>
+                    <h4 class="text-xs font-bold text-red-600 uppercase tracking-wider mb-3">Zona Bahaya</h4>
+                    <div class="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 border border-red-100 dark:border-red-900/30">
+                        <p class="text-xs text-red-700 dark:text-red-400 mb-3 leading-relaxed">
+                            <b>Reset Pabrik:</b> Menghapus seluruh data permanen.
+                        </p>
+                        <button onclick="handleFormatDatabase()" class="w-full bg-white dark:bg-gray-800 border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-600 hover:text-white font-bold py-2 px-4 rounded-md text-sm transition-colors flex items-center justify-center shadow-sm">
+                            <i class="fas fa-trash-alt mr-2"></i> Format Database
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="genericConfirmModal" class="fixed inset-0 bg-gray-800 bg-opacity-60 overflow-y-auto h-full w-full hidden flex items-center justify-center z-[100]">
+        <div class="relative mx-auto p-6 border w-11/12 max-w-sm shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <div class="text-center">
+                <div id="confirmModalIconContainer" class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900"><i id="confirmModalIcon" class="fas fa-exclamation-triangle text-red-600 dark:text-red-300 text-xl"></i></div>
+                <h3 id="confirmModalTitle" class="text-lg leading-6 font-medium text-gray-900 dark:text-white mt-5">Konfirmasi</h3>
+                <div class="mt-2 px-7 py-3"><p id="confirmModalMessage" class="text-sm text-gray-500 dark:text-gray-400">Yakin?</p></div>
+                <div class="items-center px-4 py-3 space-x-4">
+                    <button id="confirmModalCancelBtn" class="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-white rounded-md hover:bg-gray-300 w-24">Batal</button>
+                    <button id="confirmModalConfirmBtn" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 w-24">Ya</button>
+                </div>
+            </div>
         </div>
     </div>
 
     <div id="notificationToast" class="fixed top-5 right-5 z-[100] hidden">
         <div class="flex items-center p-4 mb-4 w-full max-w-xs text-white rounded-lg shadow-2xl transition-all duration-300" id="toastContainer">
             <div class="inline-flex flex-shrink-0 justify-center items-center w-8 h-8 rounded-lg bg-white/20" id="toastIconBox"><i id="toastIcon" class="fas fa-info-circle"></i></div>
-            <div class="ml-3 text-sm font-normal" id="notificationMessage">Pesan notifikasi.</div>
+            <div class="ml-3 text-sm font-normal" id="notificationMessage">Pesan.</div>
             <button type="button" onclick="this.parentElement.parentElement.classList.add('toast-animate-out')" class="ml-auto -mx-1.5 -my-1.5 rounded-lg focus:ring-2 p-1.5 inline-flex h-8 w-8 text-white/50 hover:text-white"><i class="fas fa-times"></i></button>
-        </div>
-    </div>
-    
-    <div id="genericConfirmModal" class="fixed inset-0 bg-gray-800 bg-opacity-60 overflow-y-auto h-full w-full hidden flex items-center justify-center z-[60]">
-        <div class="relative mx-auto p-6 border w-11/12 max-w-sm shadow-lg rounded-md bg-white">
-            <div class="text-center">
-                <div id="confirmModalIconContainer" class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100"><i id="confirmModalIcon" class="fas fa-exclamation-triangle text-red-600 text-xl"></i></div>
-                <h3 id="confirmModalTitle" class="text-lg leading-6 font-medium text-gray-900 mt-5">Konfirmasi</h3>
-                <div class="mt-2 px-7 py-3"><p id="confirmModalMessage" class="text-sm text-gray-500">Yakin?</p></div>
-                <div class="items-center px-4 py-3 space-x-4">
-                    <button id="confirmModalCancelBtn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 w-24">Batal</button>
-                    <button id="confirmModalConfirmBtn" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 w-24">Ya</button>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -339,64 +433,5 @@
         });
     }
     </script>
-    <div id="payslipModal" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full hidden z-[70] flex items-center justify-center backdrop-blur-sm">
-    <div class="relative bg-white w-full max-w-sm mx-auto rounded-lg shadow-2xl overflow-hidden">
-        <div class="h-2 bg-blue-600 w-full"></div>
-        
-        <div class="p-6">
-            <div class="text-center border-b border-gray-200 pb-4 mb-4">
-                <div class="mx-auto h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 mb-2">
-                    <i class="fas fa-tent text-xl"></i>
-                </div>
-                <h2 class="text-xl font-bold text-gray-800 tracking-wide uppercase">DJR TENDA</h2>
-                <p class="text-xs text-gray-500">Bukti Transaksi Keuangan</p>
-            </div>
-
-            <div id="payslipContent" class="space-y-3 text-sm">
-                <div class="flex justify-between">
-                    <span class="text-gray-500">Tanggal</span>
-                    <span id="psDate" class="font-semibold text-gray-800">01 Jan 2025</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-500">Karyawan</span>
-                    <span id="psName" class="font-semibold text-gray-800">Ujang</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-500">Jenis</span>
-                    <span id="psType" class="font-semibold text-gray-800">Gaji Bulanan</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-500">Keterangan</span>
-                    <span id="psDesc" class="text-right text-gray-800 max-w-[150px] truncate">Bonus</span>
-                </div>
-                
-                <div class="my-4 border-t border-dashed border-gray-300"></div>
-                
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-600 font-bold">NOMINAL</span>
-                    <span id="psAmount" class="text-2xl font-extrabold text-blue-600">Rp 0</span>
-                </div>
-            </div>
-
-            <div class="mt-8 text-center">
-                <p class="text-[10px] text-gray-400 mb-8">Disetujui Oleh Admin</p>
-                <div class="mx-auto w-32 border-b border-gray-300"></div>
-                <p class="text-xs font-bold text-gray-400 mt-1">DJR Tenda Finance</p>
-            </div>
-        </div>
-
-        <div class="bg-gray-50 px-6 py-4 flex space-x-3">
-            <button onclick="document.getElementById('payslipModal').classList.add('hidden')" class="flex-1 bg-white border border-gray-300 text-gray-700 py-2 rounded-md hover:bg-gray-50 font-medium text-sm">
-                Tutup
-            </button>
-            <button id="btnShareWA" class="flex-1 bg-green-600 text-white py-2 rounded-md hover:bg-green-700 font-medium text-sm flex items-center justify-center">
-                <i class="fab fa-whatsapp mr-2"></i> Kirim WA
-            </button>
-            <button id="btnDownloadPDF" class="flex-1 bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 font-medium text-sm flex items-center justify-center">
-                <i class="fas fa-file-pdf mr-2"></i> PDF
-            </button>
-        </div>
-    </div>
-</div>
 </body>
 </html>

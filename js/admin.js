@@ -1,30 +1,28 @@
 let employees = [];
 let transactions = [];
 let salaryChartInstance = null;
-let currentPayslipData = null; // Variabel untuk menyimpan data slip yang sedang dibuka
+let currentPayslipData = null;
 
-// State untuk Pagination Transaksi
-let transactionQueryState = {
-    lastVisible: null,
-    firstVisible: null,
-    currentPage: 1,
-    pageSize: 10
-};
+let transactionQueryState = { lastVisible: null, firstVisible: null, currentPage: 1, pageSize: 10 };
 
-// Elemen DOM untuk Stats
 const totalEmployeesEl = document.getElementById('totalEmployees');
 const totalSalaryDistributedEl = document.getElementById('totalSalaryDistributed');
 const totalHeldBalanceEl = document.getElementById('totalHeldBalance'); 
 const monthlyTransactionsEl = document.getElementById('monthlyTransactions');
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Set Nama Admin
+    // 1. INIT DARK MODE
+    if (localStorage.getItem('theme') === 'dark') {
+        document.documentElement.classList.add('dark');
+    } else {
+        document.documentElement.classList.remove('dark');
+    }
+
     const adminName = localStorage.getItem('userName') || 'Admin';
     if(document.getElementById('adminName')) {
         document.getElementById('adminName').textContent = adminName;
     }
 
-    // Set Default Filter Tanggal Export ke Bulan Ini
     const today = new Date();
     const currentMonth = today.toISOString().slice(0, 7); 
     const exportInput = document.getElementById('exportPeriod');
@@ -34,7 +32,6 @@ document.addEventListener('DOMContentLoaded', function() {
     setupEventListeners();
     setupTabs();
     
-    // Setup Form Edit Karyawan
     const editForm = document.getElementById('editEmployeeForm');
     if(editForm) {
         editForm.addEventListener('submit', handleUpdateEmployee);
@@ -42,32 +39,167 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function setupEventListeners() {
-    // Handler Modal & Form Utama
     document.getElementById('distributeSalaryForm').addEventListener('submit', handleDistributeSalary);
     document.getElementById('addEmployeeForm').addEventListener('submit', handleAddEmployee);
     document.getElementById('addSalaryForm').addEventListener('submit', handleAddIndividualSalary);
     document.getElementById('withdrawForm').addEventListener('submit', handleInstantWithdraw);
 
-    // Filter & Navigasi Transaksi
     document.getElementById('transactionFilter').addEventListener('change', filterTransactions);
     document.getElementById('exportPdfBtn').addEventListener('click', exportTransactionsToPDF);
     document.getElementById('prevPageBtn').addEventListener('click', () => loadTransactions('prev'));
     document.getElementById('nextPageBtn').addEventListener('click', () => loadTransactions('next'));
 
-    // Formatting Input Rupiah (Auto Format saat ketik)
-    const inputsToFormat = [
-        'salaryAmount', 
-        'individualSalaryAmount', 
-        'withdrawAmount'
-    ];
-
+    const inputsToFormat = ['salaryAmount', 'individualSalaryAmount', 'withdrawAmount'];
     inputsToFormat.forEach(id => {
         const el = document.getElementById(id);
         if(el) el.addEventListener('input', function() { DJRTenda.formatNumberInput(this); });
     });
     
-    // Search Handler (Menggunakan Render Card)
     document.getElementById('searchEmployee').addEventListener('input', renderEmployeesCard);
+}
+
+// --- FITUR BARU: TOGGLE DARK MODE (Auto Refresh Chart) ---
+function toggleDarkMode() {
+    const html = document.documentElement;
+    let isDark;
+
+    if (html.classList.contains('dark')) {
+        html.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
+        isDark = false;
+    } else {
+        html.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+        isDark = true;
+    }
+
+    // UPDATE: Paksa chart digambar ulang agar warna teks berubah
+    if(typeof renderSalaryChart === 'function') {
+        // Beri jeda sedikit agar transisi CSS selesai dulu, baru gambar ulang
+        setTimeout(() => {
+            renderSalaryChart(); 
+        }, 100); 
+    }
+}
+
+// --- FITUR BARU: QUICK NOMINAL ---
+function setQuickNominal(inputId, value) {
+    const input = document.getElementById(inputId);
+    if(input) {
+        input.value = value;
+        DJRTenda.formatNumberInput(input);
+        // Efek visual singkat
+        input.classList.add('bg-yellow-50', 'transition');
+        setTimeout(() => input.classList.remove('bg-yellow-50'), 300);
+    }
+}
+
+// --- FITUR BARU: BACKUP & RESTORE ---
+async function handleBackup() {
+    DJRTenda.showNotification("Membuat backup data...", true);
+    try {
+        const usersSnap = await db.collection('users').get();
+        const transSnap = await db.collection('transactions').get();
+
+        const users = [];
+        const trans = [];
+
+        usersSnap.forEach(doc => users.push({ _id: doc.id, ...doc.data() }));
+        transSnap.forEach(doc => trans.push({ _id: doc.id, ...doc.data() }));
+
+        const backupData = {
+            version: "1.0",
+            timestamp: new Date().toISOString(),
+            users: users,
+            transactions: trans
+        };
+
+        const dataStr = JSON.stringify(backupData, null, 2);
+        const blob = new Blob([dataStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Backup_DJRTenda_${new Date().toISOString().slice(0,10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        DJRTenda.showNotification("File backup berhasil didownload!", true);
+    } catch (e) {
+        console.error(e);
+        DJRTenda.showError("Gagal membuat backup.");
+    }
+}
+
+function handleRestore(inputElement) {
+    const file = inputElement.files[0];
+    if (!file) return;
+
+    DJRTenda.showConfirmDialog({
+        title: 'Restore Data?',
+        message: 'Ini akan MENIMPA semua data yang ada dengan data dari file backup. Pastikan file benar. Lanjutkan?',
+        confirmText: 'Restore',
+        confirmColor: 'blue',
+        onConfirm: () => {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (!data.users || !data.transactions) throw new Error("Format file salah.");
+                    
+                    DJRTenda.showNotification("Sedang me-restore data...", true);
+                    const batch = db.batch();
+
+                    // 1. Hapus Data Lama (Opsional: Bisa dihapus manual, tapi biar bersih kita hapus dulu)
+                    // Hapus user
+                    const uSnap = await db.collection('users').get();
+                    uSnap.forEach(doc => batch.delete(doc.ref));
+                    // Hapus trans
+                    const tSnap = await db.collection('transactions').get();
+                    tSnap.forEach(doc => batch.delete(doc.ref));
+
+                    await batch.commit(); // Commit hapus dulu agar batch tidak kepenuhan
+
+                    // 2. Insert Data Baru (Chunking karena limit batch 500)
+                    // Kita insert satu2 agar aman (agak lambat tapi pasti)
+                    
+                    const newBatch = db.batch();
+                    let opCount = 0;
+
+                    for (const u of data.users) {
+                        const ref = db.collection('users').doc(u._id);
+                        delete u._id;
+                        // Konversi timestamp string balik ke Firestore Timestamp jika perlu
+                        if(u.createdAt && typeof u.createdAt === 'string') u.createdAt = firebase.firestore.Timestamp.fromDate(new Date(u.createdAt));
+                        if(u.updatedAt && typeof u.updatedAt === 'string') u.updatedAt = firebase.firestore.Timestamp.fromDate(new Date(u.updatedAt));
+                        newBatch.set(ref, u);
+                        opCount++;
+                    }
+
+                    for (const t of data.transactions) {
+                        const ref = db.collection('transactions').doc(t._id);
+                        delete t._id;
+                        if(t.createdAt && typeof t.createdAt === 'string') t.createdAt = firebase.firestore.Timestamp.fromDate(new Date(t.createdAt));
+                        newBatch.set(ref, t);
+                        opCount++;
+                    }
+                    
+                    await newBatch.commit();
+                    
+                    DJRTenda.showNotification(`Berhasil Restore! ${opCount} data dipulihkan.`, true);
+                    setTimeout(() => location.reload(), 1500); // Reload agar data tampil
+
+                } catch (err) {
+                    console.error(err);
+                    DJRTenda.showError("Gagal restore: " + err.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+    });
+    // Reset input agar bisa pilih file sama lagi
+    inputElement.value = '';
 }
 
 function setupTabs() {
@@ -78,19 +210,16 @@ function setupTabs() {
         button.addEventListener('click', () => {
             const tabName = button.getAttribute('data-tab');
             
-            // Update Style Button
             tabButtons.forEach(btn => {
-                btn.classList.remove('active', 'border-blue-500', 'text-blue-600');
-                btn.classList.add('border-transparent', 'text-gray-500');
+                btn.classList.remove('active', 'border-blue-500', 'text-blue-600', 'dark:text-blue-400', 'dark:border-blue-400');
+                btn.classList.add('border-transparent', 'text-gray-500', 'dark:text-gray-400');
             });
-            button.classList.add('active', 'border-blue-500', 'text-blue-600');
-            button.classList.remove('border-transparent', 'text-gray-500');
+            button.classList.add('active', 'border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+            button.classList.remove('border-transparent', 'text-gray-500', 'dark:text-gray-400');
 
-            // Show Content
             tabContents.forEach(content => content.classList.add('hidden'));
             document.getElementById(`${tabName}-tab`).classList.remove('hidden');
 
-            // Load Data Specific
             if (tabName === 'employees') loadEmployees();
             else if (tabName === 'transactions') {
                 transactionQueryState = { lastVisible: null, firstVisible: null, currentPage: 1, pageSize: 10 };
@@ -99,39 +228,29 @@ function setupTabs() {
         });
     });
 
-    // Default Tab
     if (tabButtons.length > 0) tabButtons[0].click();
 }
 
-// GANTI FUNGSI loadDashboardData DENGAN INI:
 async function loadDashboardData() {
-    // Kita gunakan Realtime Listener (onSnapshot) agar statistik langsung berubah
-    // saat ada transaksi baru, tanpa perlu refresh halaman.
-    // Limit 100 agar performa tetap enteng.
     db.collection('transactions')
       .orderBy('createdAt', 'desc')
       .limit(100) 
       .onSnapshot((snapshot) => {
           transactions = [];
           snapshot.forEach(doc => {
-              // Masukkan data ke variable global
               transactions.push({ id: doc.id, ...doc.data() });
           });
-          
-          // Setelah data masuk, langsung hitung ulang statistik
           updateDashboardStats();
-          // Render ulang chart juga biar grafiknya naik
           renderSalaryChart();
       }, (error) => {
           console.error("Error listening transactions:", error);
       });
 }
 
-// --- LOGIKA KARYAWAN (CARD VIEW COMPACT + KASBON INDICATOR) ---
+// --- LOGIKA KARYAWAN ---
 
 async function loadEmployees() {
     const grid = document.getElementById('employeesGrid');
-    // Loading state
     if(employees.length === 0) {
         grid.innerHTML = '<div class="col-span-full text-center py-10 text-gray-400"><i class="fas fa-circle-notch fa-spin mr-2"></i>Memuat data...</div>';
     }
@@ -141,7 +260,7 @@ async function loadEmployees() {
           .onSnapshot(snapshot => {
             employees = [];
             snapshot.forEach(doc => employees.push({ id: doc.id, ...doc.data() }));
-            renderEmployeesCard(); // Render tampilan kartu baru
+            renderEmployeesCard();
             updateDashboardStats();
           }, error => {
               console.error("Error listening employees:", error);
@@ -169,44 +288,38 @@ function renderEmployeesCard() {
 
     filtered.forEach(employee => {
         const initial = employee.name.charAt(0).toUpperCase();
-        const balance = employee.balance || 0;
-        const isKasbon = balance < 0; // Deteksi saldo minus
+        const balance = Number(employee.balance) || 0;
+        const isKasbon = balance < 0; 
 
-        // Format tanggal pendek
         const dateObj = employee.updatedAt ? employee.updatedAt.toDate() : new Date();
         const lastUpdate = dateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) + ', ' + 
                            dateObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
         
-        // --- LOGIKA TAMPILAN DINAMIS (RED if KASBON) ---
-        const cardBg = isKasbon ? "bg-red-50" : "bg-white";
-        const cardBorder = isKasbon ? "border-red-300 ring-1 ring-red-100" : "border-gray-200";
-        const balanceColor = isKasbon ? "text-red-600" : (balance > 0 ? "text-gray-800" : "text-gray-400");
-        const avatarBg = isKasbon ? "bg-red-100 text-red-600 border-red-200" : "bg-blue-100 text-blue-600 border-blue-200";
+        const cardBg = isKasbon ? "bg-red-50 dark:bg-red-900/20" : "bg-white dark:bg-gray-800";
+        const cardBorder = isKasbon ? "border-red-300 dark:border-red-800 ring-1 ring-red-100 dark:ring-red-900/30" : "border-gray-200 dark:border-gray-700";
+        const balanceColor = isKasbon ? "text-red-600 dark:text-red-400" : (balance > 0 ? "text-gray-800 dark:text-gray-100" : "text-gray-400 dark:text-gray-500");
+        const avatarBg = isKasbon ? "bg-red-100 text-red-600 border-red-200 dark:bg-red-900 dark:text-red-300 dark:border-red-800" : "bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-800";
         
-        // Badge "HUTANG" di pojok kanan atas
         const kasbonBadge = isKasbon ? 
             `<div class="absolute top-0 right-0 bg-red-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl-lg shadow-sm z-10">
                 KASBON
              </div>` : '';
 
         const card = document.createElement('div');
-        // Compact Style
         card.className = `${cardBg} rounded-lg shadow-sm border ${cardBorder} overflow-hidden flex flex-col relative transition-all duration-200 hover:shadow-md`;
         
         card.innerHTML = `
             ${kasbonBadge}
-
-            <div class="p-3 flex items-center justify-between ${isKasbon ? 'bg-red-100/30' : 'bg-gray-50/50'}">
+            <div class="p-3 flex items-center justify-between ${isKasbon ? 'bg-red-100/30 dark:bg-red-900/10' : 'bg-gray-50/50 dark:bg-gray-700/30'}">
                 <div class="flex items-center overflow-hidden">
                     <div class="h-8 w-8 rounded-full ${avatarBg} flex-shrink-0 flex items-center justify-center font-bold text-sm border">
                         ${initial}
                     </div>
                     <div class="ml-2.5 min-w-0 pr-4">
-                        <h4 class="text-sm font-bold text-gray-900 truncate leading-tight">${employee.name}</h4>
-                        <p class="text-[10px] text-gray-400 truncate mt-0.5"><i class="fas fa-history mr-1"></i>${lastUpdate}</p>
+                        <h4 class="text-sm font-bold text-gray-900 dark:text-white truncate leading-tight">${employee.name}</h4>
+                        <p class="text-[10px] text-gray-400 dark:text-gray-500 truncate mt-0.5"><i class="fas fa-history mr-1"></i>${lastUpdate}</p>
                     </div>
                 </div>
-                
                 <div class="flex-shrink-0 flex space-x-1 ml-1 ${isKasbon ? 'mt-4' : ''}"> 
                     <button onclick="showEditEmployeeModal('${employee.id}', '${employee.name}')" 
                             class="text-gray-300 hover:text-yellow-600 p-1 rounded transition">
@@ -218,23 +331,21 @@ function renderEmployeesCard() {
                     </button>
                 </div>
             </div>
-
-            <div class="px-3 py-2 text-center border-t border-b ${isKasbon ? 'border-red-100' : 'border-gray-50'}">
-                <p class="text-[9px] uppercase tracking-wider font-semibold text-gray-400 mb-0.5">
+            <div class="px-3 py-2 text-center border-t border-b ${isKasbon ? 'border-red-100 dark:border-red-900/50' : 'border-gray-50 dark:border-gray-700'}">
+                <p class="text-[9px] uppercase tracking-wider font-semibold text-gray-400 dark:text-gray-500 mb-0.5">
                     ${isKasbon ? 'Sisa Hutang' : 'Saldo Tersimpan'}
                 </p>
                 <div class="text-lg font-extrabold ${balanceColor} tracking-tight">
                     ${DJRTenda.formatCurrency(balance)}
                 </div>
             </div>
-
-            <div class="grid grid-cols-2 divide-x divide-gray-100 ${isKasbon ? 'bg-red-50' : 'bg-gray-50'}">
+            <div class="grid grid-cols-2 divide-x divide-gray-100 dark:divide-gray-700 ${isKasbon ? 'bg-red-50 dark:bg-red-900/20' : 'bg-gray-50 dark:bg-gray-700/50'}">
                 <button onclick="showAddSalaryModal('${employee.id}', '${employee.name}')" 
-                        class="py-2 text-xs font-bold text-blue-600 hover:bg-blue-100 transition flex items-center justify-center">
+                        class="py-2 text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition flex items-center justify-center">
                     <i class="fas fa-plus-circle mr-1.5"></i> Tambah
                 </button>
                 <button onclick="showInstantWithdrawModal('${employee.id}', '${employee.name}')" 
-                        class="py-2 text-xs font-bold text-red-600 hover:bg-red-100 transition flex items-center justify-center">
+                        class="py-2 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 transition flex items-center justify-center">
                     <i class="fas fa-minus-circle mr-1.5"></i> Tarik
                 </button>
             </div>
@@ -243,18 +354,16 @@ function renderEmployeesCard() {
     });
 }
 
-// --- CREATE, UPDATE, DELETE KARYAWAN ---
+// --- CRUD ---
 
 async function handleAddEmployee(e) {
     e.preventDefault();
     const nameInput = document.getElementById('employeeName');
     const btn = e.target.querySelector('button[type="submit"]');
-
     const name = nameInput.value.trim();
     if (!name) return DJRTenda.showError("Nama wajib diisi.");
 
     DJRTenda.setButtonLoadingState(btn, true, "Menyimpan...");
-
     try {
         await db.collection('users').add({
             name: name,
@@ -263,12 +372,11 @@ async function handleAddEmployee(e) {
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
-
         DJRTenda.showNotification(`Karyawan "${name}" berhasil ditambahkan!`, true);
         document.getElementById('addEmployeeForm').reset();
         document.getElementById('addEmployeeModal').classList.add('hidden');
     } catch (error) {
-        console.error("Error add employee:", error);
+        console.error(error);
         DJRTenda.showError("Gagal menyimpan data.");
     } finally {
         DJRTenda.setButtonLoadingState(btn, false);
@@ -280,10 +388,8 @@ async function handleUpdateEmployee(e) {
     const id = document.getElementById('editEmployeeId').value;
     const newName = document.getElementById('editEmployeeName').value.trim();
     const btn = e.target.querySelector('button[type="submit"]');
-
     if (!newName) return DJRTenda.showError("Nama tidak boleh kosong");
     DJRTenda.setButtonLoadingState(btn, true, "Update...");
-
     try {
         await db.collection('users').doc(id).update({
             name: newName,
@@ -299,32 +405,88 @@ async function handleUpdateEmployee(e) {
 }
 
 function deleteEmployee(id, btnElement) {
-    const processDelete = async () => {
-        DJRTenda.setButtonLoadingState(btnElement, true, '...');
-        try {
-            await db.collection('users').doc(id).delete();
-            DJRTenda.showNotification("Karyawan dihapus dari database.", true);
-        } catch (error) {
-            console.error(error);
-            DJRTenda.showError("Gagal menghapus.");
-        } finally {
-            DJRTenda.setButtonLoadingState(btnElement, false);
-        }
-    };
-
     DJRTenda.showConfirmDialog({
         title: 'Hapus Karyawan?',
         message: 'Data saldo dan profil akan hilang permanen. Lanjutkan?',
         confirmText: 'Hapus',
         confirmColor: 'red',
-        onConfirm: processDelete
+        onConfirm: async () => {
+            DJRTenda.setButtonLoadingState(btnElement, true, '...');
+            try {
+                await db.collection('users').doc(id).delete();
+                DJRTenda.showNotification("Karyawan dihapus.", true);
+            } catch (error) {
+                console.error(error);
+                DJRTenda.showError("Gagal menghapus.");
+            } finally {
+                DJRTenda.setButtonLoadingState(btnElement, false);
+            }
+        }
     });
 }
 
+// --- FORMAT DATABASE ---
+function handleFormatDatabase() {
+    DJRTenda.showConfirmDialog({
+        title: '⚠ BAHAYA: Format Data?',
+        message: 'Anda akan menghapus SELURUH data Karyawan dan Riwayat Transaksi. Tindakan ini tidak bisa dibatalkan. Yakin?',
+        confirmText: 'Lanjut...',
+        confirmColor: 'red',
+        onConfirm: () => {
+            setTimeout(() => {
+                DJRTenda.showConfirmDialog({
+                    title: '⚠ KONFIRMASI TERAKHIR',
+                    message: 'Pastikan sudah BACKUP data. Data hilang tidak bisa kembali. Hapus?',
+                    confirmText: 'YA, HAPUS SEMUANYA',
+                    confirmColor: 'red',
+                    onConfirm: processFormatDatabase
+                });
+            }, 500);
+        }
+    });
+}
 
-// --- LOGIKA TRANSAKSI (GAJI & TARIK) ---
+async function processFormatDatabase() {
+    DJRTenda.showNotification("Sedang menghapus semua data...", true);
 
-// 1. Tambah Gaji Individu
+    try {
+        const batch = db.batch();
+        let deleteCount = 0;
+
+        const usersSnap = await db.collection('users').where('role', '==', 'employee').get();
+        usersSnap.forEach(doc => {
+            batch.delete(doc.ref);
+            deleteCount++;
+        });
+
+        const transSnap = await db.collection('transactions').get();
+        transSnap.forEach(doc => {
+            batch.delete(doc.ref);
+            deleteCount++;
+        });
+
+        if (deleteCount === 0) {
+            return DJRTenda.showNotification("Database sudah kosong.", true);
+        }
+
+        await batch.commit();
+        
+        employees = [];
+        transactions = [];
+        
+        loadDashboardData();
+        loadEmployees();
+        
+        DJRTenda.showNotification(`Sukses! ${deleteCount} data telah dihapus.`, true);
+
+    } catch (error) {
+        console.error(error);
+        DJRTenda.showError("Gagal melakukan format data. Coba lagi.");
+    }
+}
+
+// --- TRANSAKSI ---
+
 async function handleAddIndividualSalary(e) {
     e.preventDefault();
     const employeeId = document.getElementById('individualEmployeeId').value;
@@ -342,7 +504,6 @@ async function handleAddIndividualSalary(e) {
         const userRef = db.collection('users').doc(employeeId);
         const transRef = db.collection('transactions').doc();
         
-        // Ambil data untuk log
         const userDoc = await userRef.get();
         const userName = userDoc.exists ? userDoc.data().name : 'Karyawan';
 
@@ -356,7 +517,7 @@ async function handleAddIndividualSalary(e) {
             employeeName: userName,
             type: 'salary',
             amount: amount,
-            description: description || 'tanpa keterangan',
+            description: description || 'Bonus/Gaji Tambahan',
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
@@ -373,7 +534,6 @@ async function handleAddIndividualSalary(e) {
     }
 }
 
-// 2. Tarik Saldo Instan (ALGORITMA OTOMATIS + WA)
 function showInstantWithdrawModal(id, name) {
     document.getElementById('withdrawEmployeeId').value = id;
     document.getElementById('withdrawEmployeeName').textContent = name;
@@ -399,14 +559,12 @@ async function handleInstantWithdraw(e) {
         const userDoc = await userRef.get();
         if(!userDoc.exists) throw new Error("User tidak ditemukan");
         
-        const currentBalance = userDoc.data().balance || 0;
+        const currentBalance = Number(userDoc.data().balance) || 0;
         const newBalance = currentBalance - amount;
 
-        // --- ALGORITMA: KASBON vs TARIK ---
         let autoLabel = (newBalance < 0) ? "Kasbon (Hutang)" : "Penarikan Tunai";
         let finalDescription = manualDesc ? `${autoLabel}: ${manualDesc}` : autoLabel;
         
-        // --- DATABASE UPDATE ---
         const batch = db.batch();
         const transRef = db.collection('transactions').doc();
 
@@ -429,7 +587,6 @@ async function handleInstantWithdraw(e) {
         document.getElementById('withdrawForm').reset();
         loadDashboardData();
 
-        // --- KONFIRMASI WA ---
         const textWA = `Halo ${employeeName},%0A%0ATelah dilakukan *${autoLabel.toUpperCase()}* sebesar: *${DJRTenda.formatCurrency(amount)}*%0AKeterangan: ${manualDesc || '-'}.%0A%0ASisa Saldo: *${DJRTenda.formatCurrency(newBalance)}*%0A%0A- DJR Tenda Admin`;
         
         DJRTenda.showConfirmDialog({
@@ -450,7 +607,6 @@ async function handleInstantWithdraw(e) {
     }
 }
 
-// 3. Distribusi Massal
 async function handleDistributeSalary(e) {
     e.preventDefault();
     const amountStr = document.getElementById('salaryAmount').value.replace(/\./g, '');
@@ -504,21 +660,15 @@ async function handleDistributeSalary(e) {
     });
 }
 
-
-// --- LOGIKA LOAD RIWAYAT TRANSAKSI (TABLE) ---
-
 async function loadTransactions(direction = 'first') {
     const loadingBtn = direction === 'next' ? document.getElementById('nextPageBtn') : document.getElementById('prevPageBtn');
     if(loadingBtn) DJRTenda.setButtonLoadingState(loadingBtn, true, '...');
 
     try {
         let query = db.collection('transactions').orderBy('createdAt', 'desc');
-        
-        // Filter Type
         const filter = document.getElementById('transactionFilter').value;
         if (filter !== 'all') query = query.where('type', '==', filter);
 
-        // Pagination
         if (direction === 'next' && transactionQueryState.lastVisible) {
             query = query.startAfter(transactionQueryState.lastVisible);
         } else if (direction === 'prev' && transactionQueryState.firstVisible) {
@@ -572,22 +722,22 @@ function renderTransactionsTable(data) {
     data.forEach(t => {
         const row = document.createElement('tr');
         const isSalary = t.type === 'salary';
-        const colorClass = isSalary ? 'text-green-600' : 'text-red-600';
+        const colorClass = isSalary ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
         const iconClass = isSalary ? 'fa-arrow-down' : 'fa-arrow-up';
         const typeLabel = isSalary ? 'Gaji Masuk' : 'Penarikan';
         const sign = isSalary ? '+' : '-';
 
         row.innerHTML = `
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${DJRTenda.formatDate(t.createdAt ? t.createdAt.toDate() : new Date())}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${t.employeeName || 'Tanpa Nama'}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><i class="fas ${iconClass} ${colorClass} mr-2"></i>${typeLabel}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">${DJRTenda.formatDate(t.createdAt ? t.createdAt.toDate() : new Date())}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">${t.employeeName || 'Tanpa Nama'}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300"><i class="fas ${iconClass} ${colorClass} mr-2"></i>${typeLabel}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-bold ${colorClass}">${sign} ${DJRTenda.formatCurrency(t.amount)}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate">${t.description || '-'}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate">${t.description || '-'}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                <button onclick="openPayslip('${t.id}')" class="text-blue-600 hover:text-blue-900 mr-3" title="Lihat Slip">
+                <button onclick="openPayslip('${t.id}')" class="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-200 mr-3" title="Lihat Slip">
                     <i class="fas fa-file-invoice"></i>
                 </button>
-                <button onclick="deleteTransaction('${t.id}', this)" class="text-gray-400 hover:text-red-700" title="Hapus Log">
+                <button onclick="deleteTransaction('${t.id}', this)" class="text-gray-400 hover:text-red-700 dark:hover:text-red-400" title="Hapus Log">
                     <i class="fas fa-trash"></i>
                 </button>
             </td>
@@ -602,14 +752,14 @@ function renderTransactionsTable(data) {
 async function deleteTransaction(id, btn) {
     DJRTenda.showConfirmDialog({
         title: 'Hapus Log?',
-        message: 'Log akan dihapus permanen. Saldo karyawan TIDAK akan berubah otomatis (harus manual jika perlu).',
+        message: 'Log akan dihapus permanen. Saldo karyawan TIDAK akan berubah otomatis.',
         confirmText: 'Hapus Log',
         confirmColor: 'red',
         onConfirm: async () => {
              DJRTenda.setButtonLoadingState(btn, true, '...');
              try {
                  await db.collection('transactions').doc(id).delete();
-                 loadTransactions('first'); // Refresh
+                 loadTransactions('first'); 
                  DJRTenda.showNotification('Log dihapus.', true);
              } catch(e) { DJRTenda.showError('Gagal hapus log.'); }
              finally { DJRTenda.setButtonLoadingState(btn, false); }
@@ -617,24 +767,16 @@ async function deleteTransaction(id, btn) {
     });
 }
 
-
-// --- FITUR SLIP GAJI / NOTA (LINK & PDF) ---
-
 function openPayslip(transactionId) {
-    // Cari data di variabel global transactions (atau fetch jika perlu)
     let t = transactions.find(tr => tr.id === transactionId);
-    
-    // Jika tidak ada di memory (karena pagination), kita biarkan dulu (bisa ditambahkan fetchSingleTransaction)
-    // Asumsi: Admin membuka slip dari list yang sedang tampil
     if (!t) return DJRTenda.showError("Data transaksi tidak ditemukan di memori. Coba refresh.");
 
     currentPayslipData = t;
     const date = t.createdAt ? t.createdAt.toDate() : new Date();
     const typeLabel = t.type === 'salary' ? 'GAJI MASUK' : 'PENARIKAN / KASBON';
-    const amountColor = t.type === 'salary' ? 'text-blue-600' : 'text-red-600';
+    const amountColor = t.type === 'salary' ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400';
     const sign = t.type === 'salary' ? '+' : '-';
 
-    // Isi Modal
     document.getElementById('psDate').textContent = DJRTenda.formatDate(date);
     document.getElementById('psName').textContent = t.employeeName;
     document.getElementById('psType').textContent = typeLabel;
@@ -644,9 +786,8 @@ function openPayslip(transactionId) {
     amountEl.textContent = sign + ' ' + DJRTenda.formatCurrency(t.amount);
     amountEl.className = `text-2xl font-extrabold ${amountColor}`;
 
-    // Setup Actions
     document.getElementById('btnShareWA').onclick = () => {
-        const text = `*BUKTI TRANSAKSI - DJR TENDA*%0A--------------------------------%0ATanggal: ${DJRTenda.formatDate(date)}%0AKaryawan: ${t.employeeName}%0AJenis: ${typeLabel}%0AKeterangan: ${t.description || '-'}%0A--------------------------------%0A*NOMINAL: ${sign} ${DJRTenda.formatCurrency(t.amount)}*%0A--------------------------------`;
+        const text = `*BUKTI TRANSAKSI - DJR TENDA*%0A--------------------------------%0ATanggal: ${DJRTenda.formatDate(date)}%0AKaryawan: ${t.employeeName}%0AJenis: ${typeLabel}%0AKeterangan: ${t.description || '-'}%0A--------------------------------%0A*NOMINAL: ${sign} ${DJRTenda.formatCurrency(t.amount)}*%0A--------------------------------%0A%0A_Ini adalah bukti transaksi digital yang sah._`;
         window.open(`https://wa.me/?text=${text}`, '_blank');
     };
 
@@ -662,14 +803,13 @@ function generatePayslipPDF(t) {
     const doc = new jsPDF({
         orientation: "portrait",
         unit: "mm",
-        format: [80, 150] // Struk width 80mm
+        format: [80, 150]
     });
 
     const date = t.createdAt ? t.createdAt.toDate() : new Date();
     const typeLabel = t.type === 'salary' ? 'PEMBAYARAN GAJI' : 'PENARIKAN / KASBON';
     const sign = t.type === 'salary' ? '' : '-';
     
-    // Header
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.text("DJR TENDA", 40, 10, { align: "center" });
@@ -680,7 +820,6 @@ function generatePayslipPDF(t) {
     doc.setFontSize(10);
     doc.text("BUKTI TRANSAKSI", 40, 25, { align: "center" });
 
-    // Content
     let y = 35;
     const lineHeight = 6;
     doc.setFontSize(8);
@@ -707,13 +846,11 @@ function generatePayslipPDF(t) {
     doc.text("------------------------------------------------", 40, y, { align: "center" });
     y += 5;
 
-    // Nominal
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.text(`${sign} ${DJRTenda.formatCurrency(t.amount)}`, 40, y + 5, { align: "center" });
     y += 15;
 
-    // Footer
     doc.setFontSize(7);
     doc.setFont("helvetica", "italic");
     doc.text("Dicetak otomatis oleh Sistem DJR Tenda", 40, y, { align: "center" });
@@ -722,43 +859,28 @@ function generatePayslipPDF(t) {
     DJRTenda.showNotification("Slip PDF berhasil didownload", true);
 }
 
-
-// --- UTILITIES & STATS ---
-
-// GANTI FUNGSI updateDashboardStats DENGAN INI:
 function updateDashboardStats() {
-    // 1. Update Total Karyawan
     if(totalEmployeesEl) totalEmployeesEl.textContent = employees.length;
 
-    // 2. Saldo Tertahan (Total uang di dompet karyawan)
-    // Diambil dari data karyawan (employees)
     const totalHeld = employees.reduce((acc, curr) => acc + (Number(curr.balance) || 0), 0);
     if(totalHeldBalanceEl) totalHeldBalanceEl.textContent = DJRTenda.formatCurrency(totalHeld);
 
-    // 3. Total Gaji Dibagikan (Total uang yang keluar dari bos)
-    // Diambil dari data transaksi (transactions) yang tipe-nya 'salary'
     if(totalSalaryDistributedEl) {
         const totalSalary = transactions
             .filter(t => t.type === 'salary')
-            .reduce((sum, t) => sum + (Number(t.amount) || 0), 0); // Pastikan angka dibaca sebagai Number
-            
+            .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
         totalSalaryDistributedEl.textContent = DJRTenda.formatCurrency(totalSalary);
     }
 
-    // 4. Transaksi Bulan Ini
     if(monthlyTransactionsEl) {
         const now = new Date();
         const currentMonth = now.getMonth();
         const currentYear = now.getFullYear();
-        
         const count = transactions.filter(t => {
-            // Cek apakah tanggal valid
             if (!t.createdAt) return false; 
             const d = t.createdAt.toDate();
-            // Cek apakah bulan dan tahun sama dengan hari ini
             return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
         }).length;
-        
         monthlyTransactionsEl.textContent = count;
     }
 }
@@ -767,10 +889,8 @@ function renderSalaryChart() {
     const ctx = document.getElementById('salaryChart');
     if (!ctx) return;
     
-    // Ambil data dari transaksi yang sudah di-load
+    // Perbaikan warna chart untuk dark mode (tetap biru cerah)
     const salaryData = transactions.filter(t => t.type === 'salary');
-    
-    // Group by Month (Last 6 months)
     const monthlyData = {};
     const months = [];
     for(let i=5; i>=0; i--) {
@@ -795,6 +915,11 @@ function renderSalaryChart() {
 
     if(salaryChartInstance) salaryChartInstance.destroy();
 
+    // Cek Dark Mode untuk warna teks chart
+    const isDark = document.documentElement.classList.contains('dark');
+    const textColor = isDark ? '#e5e7eb' : '#374151';
+    const gridColor = isDark ? '#4b5563' : '#e5e7eb';
+
     salaryChartInstance = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -802,8 +927,8 @@ function renderSalaryChart() {
             datasets: [{
                 label: 'Gaji Dibagikan',
                 data: data,
-                backgroundColor: 'rgba(37, 99, 235, 0.6)',
-                borderColor: 'rgba(37, 99, 235, 1)',
+                backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                borderColor: 'rgba(59, 130, 246, 1)',
                 borderWidth: 1,
                 borderRadius: 4
             }]
@@ -812,9 +937,18 @@ function renderSalaryChart() {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                y: { beginAtZero: true, ticks: { callback: v => 'Rp ' + (v/1000) + 'k' } }
+                y: { 
+                    beginAtZero: true, 
+                    ticks: { color: textColor, callback: v => 'Rp ' + (v/1000) + 'k' },
+                    grid: { color: gridColor }
+                },
+                x: {
+                    ticks: { color: textColor },
+                    grid: { display: false }
+                }
             },
             plugins: {
+                legend: { labels: { color: textColor } },
                 tooltip: {
                     callbacks: { label: c => DJRTenda.formatCurrency(c.raw) }
                 }
@@ -823,7 +957,6 @@ function renderSalaryChart() {
     });
 }
 
-// Export PDF (Report Bulanan)
 function exportTransactionsToPDF() {
     const periodValue = document.getElementById('exportPeriod').value;
     if(!periodValue) return DJRTenda.showError("Pilih bulan laporan dulu.");
@@ -841,11 +974,9 @@ function exportTransactionsToPDF() {
         onConfirm: async () => {
             const btn = document.getElementById('exportPdfBtn');
             DJRTenda.setButtonLoadingState(btn, true, 'Exporting...');
-            
             try {
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF();
-
                 const snapshot = await db.collection('transactions')
                     .where('createdAt', '>=', startDate)
                     .where('createdAt', '<=', endDate)
@@ -905,7 +1036,6 @@ function exportTransactionsToPDF() {
     });
 }
 
-// Helper Modal Display
 function showAddEmployeeModal() { document.getElementById('addEmployeeModal').classList.remove('hidden'); }
 function showEditEmployeeModal(id, name) {
     document.getElementById('editEmployeeId').value = id;
