@@ -1,12 +1,6 @@
 let currentData = null; // Untuk export Excel
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Cek Akses Admin
-    if (localStorage.getItem('userRole') !== 'admin') {
-        window.location.href = 'index.html';
-        return;
-    }
-
     // Set Filter Bulan Ini
     const today = new Date();
     const currentMonth = today.toISOString().slice(0, 7);
