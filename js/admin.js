@@ -103,17 +103,28 @@ function setupTabs() {
     if (tabButtons.length > 0) tabButtons[0].click();
 }
 
+// GANTI FUNGSI loadDashboardData DENGAN INI:
 async function loadDashboardData() {
-    try {
-        // Load data awal sekilas untuk grafik & stats
-        const snapshot = await db.collection('transactions').orderBy('createdAt', 'desc').limit(50).get();
-        transactions = [];
-        snapshot.forEach(doc => transactions.push({ id: doc.id, ...doc.data() }));
-        
-        updateDashboardStats();
-    } catch (error) {
-        console.error('Error loading dashboard:', error);
-    }
+    // Kita gunakan Realtime Listener (onSnapshot) agar statistik langsung berubah
+    // saat ada transaksi baru, tanpa perlu refresh halaman.
+    // Limit 100 agar performa tetap enteng.
+    db.collection('transactions')
+      .orderBy('createdAt', 'desc')
+      .limit(100) 
+      .onSnapshot((snapshot) => {
+          transactions = [];
+          snapshot.forEach(doc => {
+              // Masukkan data ke variable global
+              transactions.push({ id: doc.id, ...doc.data() });
+          });
+          
+          // Setelah data masuk, langsung hitung ulang statistik
+          updateDashboardStats();
+          // Render ulang chart juga biar grafiknya naik
+          renderSalaryChart();
+      }, (error) => {
+          console.error("Error listening transactions:", error);
+      });
 }
 
 // --- LOGIKA KARYAWAN (CARD VIEW COMPACT + KASBON INDICATOR) ---
@@ -714,16 +725,42 @@ function generatePayslipPDF(t) {
 
 // --- UTILITIES & STATS ---
 
+// GANTI FUNGSI updateDashboardStats DENGAN INI:
 function updateDashboardStats() {
-    // 1. Total Karyawan
+    // 1. Update Total Karyawan
     if(totalEmployeesEl) totalEmployeesEl.textContent = employees.length;
 
-    // 2. Saldo Tertahan (Held Balance)
-    const totalHeld = employees.reduce((acc, curr) => acc + (curr.balance || 0), 0);
+    // 2. Saldo Tertahan (Total uang di dompet karyawan)
+    // Diambil dari data karyawan (employees)
+    const totalHeld = employees.reduce((acc, curr) => acc + (Number(curr.balance) || 0), 0);
     if(totalHeldBalanceEl) totalHeldBalanceEl.textContent = DJRTenda.formatCurrency(totalHeld);
 
-    // 3. Render Chart
-    renderSalaryChart();
+    // 3. Total Gaji Dibagikan (Total uang yang keluar dari bos)
+    // Diambil dari data transaksi (transactions) yang tipe-nya 'salary'
+    if(totalSalaryDistributedEl) {
+        const totalSalary = transactions
+            .filter(t => t.type === 'salary')
+            .reduce((sum, t) => sum + (Number(t.amount) || 0), 0); // Pastikan angka dibaca sebagai Number
+            
+        totalSalaryDistributedEl.textContent = DJRTenda.formatCurrency(totalSalary);
+    }
+
+    // 4. Transaksi Bulan Ini
+    if(monthlyTransactionsEl) {
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        
+        const count = transactions.filter(t => {
+            // Cek apakah tanggal valid
+            if (!t.createdAt) return false; 
+            const d = t.createdAt.toDate();
+            // Cek apakah bulan dan tahun sama dengan hari ini
+            return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+        }).length;
+        
+        monthlyTransactionsEl.textContent = count;
+    }
 }
 
 function renderSalaryChart() {
