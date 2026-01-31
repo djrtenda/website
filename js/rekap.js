@@ -60,7 +60,6 @@ async function loadMatrixData() {
             .get();
 
         // 3. OLAH DATA MENJADI MATRIX (Pivot)
-        // Struktur: dataMatrix[TanggalString][EmployeeID] = Nominal
         let dataMatrix = {};
         let uniqueDates = new Set();
         let employeeTotals = {}; // Untuk total bawah
@@ -71,28 +70,34 @@ async function loadMatrixData() {
         transSnap.forEach(doc => {
             const t = doc.data();
             const dateObj = t.createdAt.toDate();
-            // Format Tanggal: "20 Jan"
+            
+            // Format Tanggal String: "31 Jan"
             const dateStr = dateObj.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }); 
-            // Key untuk sorting tanggal biar urut
-            const dateSortKey = dateObj.getTime(); 
+            
+            // --- PERBAIKAN DI SINI (SOLUSI DUPLIKAT BARIS) ---
+            // Kita buat Sort Key berdasarkan TANGGAL SAJA (Jam 00:00:00)
+            // Agar transaksi jam 10:00 dan 10:02 di hari yang sama dianggap SATU baris
+            const dateOnly = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+            const dateSortKey = dateOnly.getTime(); 
 
-            // Simpan tanggal unik
+            // Simpan tanggal unik (Set otomatis membuang duplikat jika kuncinya sama)
+            // Kita gunakan JSON stringify agar Set bisa mendeteksi keunikan objek
             uniqueDates.add(JSON.stringify({ str: dateStr, sort: dateSortKey }));
 
-            // Isi Matrix
+            // Isi Matrix (Akumulasi jika ada >1 transaksi per hari per orang)
             if (!dataMatrix[dateStr]) dataMatrix[dateStr] = {};
-            
-            // Jika dalam satu hari ada 2 transaksi, dijumlahkan
             if (!dataMatrix[dateStr][t.employeeId]) dataMatrix[dateStr][t.employeeId] = 0;
+            
+            // Tambahkan nominal ke hari itu
             dataMatrix[dateStr][t.employeeId] += t.amount;
 
-            // Tambah ke Total Karyawan
+            // Tambah ke Total Karyawan (Footer)
             if (employeeTotals[t.employeeId] !== undefined) {
                 employeeTotals[t.employeeId] += t.amount;
             }
         });
 
-        // Urutkan Tanggal
+        // Urutkan Tanggal (Berdasarkan Sort Key yang sudah dinormalkan ke jam 00:00)
         const sortedDates = Array.from(uniqueDates)
             .map(s => JSON.parse(s))
             .sort((a, b) => a.sort - b.sort)
@@ -116,6 +121,7 @@ async function loadMatrixData() {
                 let dailyTotal = 0;
 
                 employees.forEach(emp => {
+                    // Ambil data yang sudah diakumulasi
                     const amount = dataMatrix[dateStr] ? (dataMatrix[dateStr][emp.id] || 0) : 0;
                     dailyTotal += amount;
                     
@@ -132,7 +138,7 @@ async function loadMatrixData() {
         }
         tbody.innerHTML = bodyHtml;
 
-        // 6. RENDER FOOTER (Total per Karyawan - Yang diminta user "1 1")
+        // 6. RENDER FOOTER (Total per Karyawan)
         let footerRow = '<tr class="total-row"><td>TOTAL</td>';
         let grandTotalAll = 0;
 
